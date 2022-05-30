@@ -29,7 +29,7 @@ ad_sub <- ad %>%
          distance,
          top_hs,
          fit,
-         net_price) ## Do like three different versions
+         net_price)
 
 ## Structure for Cross Validation
 ad_rs<-mc_cv(ad_sub,times=1000)
@@ -62,7 +62,7 @@ yield_wf<-workflow()%>%
   add_recipe(yield_recipe)
 
 
-tune_fit_all=TRUE
+tune_fit_all=FALSE
 
 
 if(tune_fit_all){
@@ -83,7 +83,7 @@ save(yield_tune_fit_all,file="yield_tune_fit_all.Rdata")
 ## Extract best fit model
 yield_all_final <-
   finalize_workflow(yield_wf,
-                    select_best(yield_tune_fit,
+                    select_best(yield_tune_fit_all,
                                 metric = "roc_auc")) %>%
   fit(ad_sub)
 
@@ -91,6 +91,7 @@ save(yield_all_final,file="yield_all_final.Rdata")
 
 } else{
 load("yield_tune_fit_all.Rdata")
+  load("yield_all_final.Rdata")
 }
 
 ## Check on model fit
@@ -134,18 +135,17 @@ yield_formula <- as.formula(
 
 ## Create recipe
 yield_recipe<-recipe(yield_formula,ad_sub)%>%
-  update_role(ID, new_role = "id variable")%>%
   step_normalize(all_predictors())%>%
   step_naomit(all_predictors())
 
 ## Set workflow
-yield_wf<-
+yield_wf<-yield_wf%>%
   update_recipe(yield_recipe)
 
 
 ## Fit model to resampled Data
 
-tune_fit_academics<-TRUE
+tune_fit_academics<-FALSE
 
 if(tune_fit_academics){
 
@@ -162,12 +162,15 @@ save(yield_tune_fit_academics,file="yield_tune_fit_academics.Rdata")
 
 yield_fit_academics_final <-
   finalize_workflow(yield_wf,
-                    select_best(yield_tune_fit,
+                    select_best(yield_tune_fit_academics,
                                 metric = "roc_auc")) %>%
   fit(ad_sub)
 
 save(yield_fit_academics_final,file="yield_fit_acaademics_final.Rdata")
 
+}else{
+  load("yield_tune_fit_academics.Rdata")
+  load("yield_fit_acaademics_final.Rdata")
 }
 
 
@@ -188,7 +191,7 @@ yield_recipe<-recipe(yield_formula,ad_sub)%>%
   step_naomit(all_predictors())
 
 ## Set workflow
-yield_wf<-
+yield_wf<-yield_wf%>%
   update_recipe(yield_recipe)
 
 tune_fit_notest<-TRUE
@@ -213,4 +216,7 @@ yield_fit_notest_final <-
 
 save(yield_fit_notest_final,file="yield_fit_notest_final.Rdata")
 
+}else{
+  load("yield_tune_fit_notest.Rdata")
+  load("yield_fit_notest_final.Rdata")
 }
