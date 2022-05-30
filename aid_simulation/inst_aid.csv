@@ -1,0 +1,31 @@
+﻿Income,Type,Amount,SE
+Income:0-30k,All,2431.0814,94.04675
+Income:30k-60k,All,3196.9083,127.44383
+Income: 50-70k,All,3594.7472,179.28417
+Income: 70-100k,All,3575.012,134.01046
+Income 100-150,All,3969.5415,135.34668
+Income 150k+,All,4725.606,175.99356
+Income:0-30k,"Public 4, Non-Doctorate",714.0559,110.56643
+Income:30k-60k,"Public 4, Non-Doctorate",977.8763,156.36807
+Income: 50-70k,"Public 4, Non-Doctorate",1133.3468,145.88444
+Income: 70-100k,"Public 4, Non-Doctorate",897.9221,147.54956
+Income 100-150,"Public 4, Non-Doctorate",757.6897,123.00113
+Income 150k+,"Public 4, Non-Doctorate",1023.8338,193.71384
+Income:0-30k,"Public 4,  Doctorate",2308.5138,118.30409
+Income:30k-60k,"Public 4,  Doctorate",2610.8776,151.50106
+Income: 50-70k,"Public 4,  Doctorate",2406.6815,141.82141
+Income: 70-100k,"Public 4,  Doctorate",2426.7614,158.94382
+Income 100-150,"Public 4,  Doctorate",1859.3516,92.0938
+Income 150k+,"Public 4,  Doctorate",2056.0822,139.96754
+Income:0-30k,"Private 4, Non-Doctorate",9484.2205,711.22126
+Income:30k-60k,"Private 4, Non-Doctorate",12237.9218,845.16236
+Income: 50-70k,"Private 4, Non-Doctorate",13235.0569,806.97221
+Income: 70-100k,"Private 4, Non-Doctorate",14541.8275,736.31196
+Income 100-150,"Private 4, Non-Doctorate",13227.953,809.0935
+Income 150k+,"Private 4, Non-Doctorate",12288.464,692.78006
+Income:0-30k,"Private 4,  Doctorate",15135.2726,1009.27556
+Income:30k-60k,"Private 4,  Doctorate",17360.1248,1028.10296
+Income: 50-70k,"Private 4,  Doctorate",17300.3865,1161.35314
+Income: 70-100k,"Private 4,  Doctorate",15126.375,833.30816
+Income 100-150,"Private 4,  Doctorate",14821.1025,624.01961
+Income 150k+,"Private 4,  Doctorate",12185.7875,593.00908

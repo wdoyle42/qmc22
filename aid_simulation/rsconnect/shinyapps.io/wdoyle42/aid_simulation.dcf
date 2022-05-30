@@ -1,0 +1,14 @@
+name: aid_simulation
+title: aid_simulation
+username:
+account: wdoyle42
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6398176
+bundleId: 5960616
+url: https://wdoyle42.shinyapps.io/aid_simulation/
+when: 1653928167.93702
+lastSyncTime: 1653928167.93703
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: yield_tune_fit_all.Rdata
