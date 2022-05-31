@@ -41,6 +41,18 @@ sim_data <- read_rds("admit_data.rds")%>%
 rename_with(to_title_case)
 
 
+yield_data <- read_rds("admit_data.rds")%>%
+  mutate(sat=sat/100,
+         income=income/1000,
+         distance=distance/1000)
+
+load("model_fit_data.rdata")
+
+model_fit_data<-model_fit_data%>%
+  mutate(lower_ci=Estimate-(1.96*SE))%>%
+    mutate(upper_ci=Estimate-(1.96*SE))
+
+load("fit_list.rdata")
 
 ##################################
 # Summary Data Function
@@ -81,7 +93,7 @@ summary_plot <- function(myvar) {
 }
 
 ##################################
-# Aid Plot Function
+# Total Aid Plot Function
 ##################################
 
 total_aid_plot <- function(total_aid_type) {
@@ -96,6 +108,10 @@ total_aid_plot <- function(total_aid_type) {
 }
 
 
+##################################
+# Aid by Income  Plot Function
+##################################
+
 
 inst_aid_plot <- function(inst_type) {
   gg <- inst_aid %>%
@@ -108,6 +124,64 @@ inst_aid_plot <- function(inst_type) {
     dark_theme_minimal()
   gg
 }
+
+
+
+##################################
+# Model Fit  Plot Function
+##################################
+
+
+model_fit_plot<-function(my_metric){
+  gg<-
+    model_fit_data%>%
+    filter(Metric==my_metric)%>%
+    ggplot(aes(x=`Model Type`,y=Estimate,color=`Model Type`))+
+    geom_point()+
+    geom_pointrange(aes(ymin=lower_ci,ymax=upper_ci))+
+    ylab(my_metric)+
+    coord_flip()+
+    dark_theme_minimal()+
+    theme(legend.position = "none")
+gg
+}
+
+
+
+##################################
+# Summary Stats Function
+##################################
+
+policy_changes=c("Free for Income Less than 50k",
+                 "Charge Extra for High Yield",
+                 "Free for SAT>1300")
+
+model_type<-"All Variables"
+
+yield_fit<-fit_list[[model_type]]
+
+if("Free for Income Less than 50k"==policy_change){
+np<-yield_data%>%
+  mutate(net_price=ifelse(income<50,0,net_price))
+
+  np<-yield_fit%>%
+  predict(np)%>%
+  bind_cols(np)
+
+  np%>%
+    group_by(.pred_class)%>%
+    count()%>%
+    bind_cols(
+      np%>%
+        group_by(yield)%>%
+        count()
+    )
+
+
+}
+
+
+
 
 
 
@@ -233,16 +307,22 @@ tabPanel(
 
   # Sidebar with a checkbox for type
   sidebarLayout(sidebarPanel(
+    fluidRow(
+selectInput(
+  inputId = "model_metric",
+  label="Choose Measure of Model Fit",
+  choices=unique(model_fit_data$Metric),
+  selected = "Accuracy")),
     fluidRow(img(
       src = "vu06br.jpg",
       align = "bottom",
       height = 150,
       width = 140
-    ))
-  ), # End sidebar
+    )
+  )), # End sidebar
 
-  # Show a plot of the generated distribution
-  mainPanel()  # End sidebarlayout
+  # Show a plot
+  mainPanel(plotOutput("ModelFitPlot"))  # End sidebarlayout
   )
 ),# End modeling panel
 #####################################################
@@ -311,6 +391,12 @@ tabPanel(
       ## Institutional aid by income plot
       output$SimDataPlot <- renderPlot({
         summary_plot(input$simvar)
+      },bg="transparent") ## End Income Plot Output
+
+
+      ## Model Fit Plot
+      output$ModelFitPlot <- renderPlot({
+        model_fit_plot(input$model_metric)
       },bg="transparent") ## End Income Plot Output
 
 
