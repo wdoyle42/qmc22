@@ -1,12 +1,10 @@
-
-
-
 library(shiny)
 library(tidyverse)
 library(scales)
 library(shinythemes)
 library(ggdark)
 library(snakecase)
+library(tidymodels)
 
 
 ###########################################
@@ -152,38 +150,84 @@ gg
 # Summary Stats Function
 ##################################
 
-policy_changes=c("Free for Income Less than 50k",
-                 "Charge Extra for High Yield",
-                 "Free for SAT>1300")
-
-model_type<-"All Variables"
+summary_change<-function(
+  model_type="All Variables",
+                         prob_min=.45,
+                         prob_max=.55,
+                         price_drop=10000){
 
 yield_fit<-fit_list[[model_type]]
 
-if("Free for Income Less than 50k"==policy_change){
-np<-yield_data%>%
-  mutate(net_price=ifelse(income<50,0,net_price))
+np<-yield_data
 
-  np<-yield_fit%>%
-  predict(np)%>%
+## Predict for current
+
+np<-yield_fit%>%
+  predict(np,type="prob")%>%
   bind_cols(np)
 
-  np%>%
-    group_by(.pred_class)%>%
+pre_price<-  np%>%
+    mutate(`Income Quintile`=ntile(income,5))%>%
+    group_by(`Income Quintile`)%>%
+    summarize(`Current Price`=mean(net_price))
+
+pre_enroll<-np%>%
+  filter(.pred_Enrolled>.5)%>%
+  count()%>%
+  as_vector()%>%
+  number(big.mark = ",")
+
+pre_revenues<-dollar(sum(np$net_price[np$.pred_Enrolled>.5]))
+## Use inputs to set these three amounts
+
+## Predict for targeted policy
+
+## Set prices based on new policy
+np_post<-np%>%
+    mutate(net_price=ifelse(.pred_Enrolled>prob_min|.pred_Enrolled<prob_max,
+           net_price-price_drop,
+           net_price
+           ))
+
+## Drop old predictions
+np_post<-np_post%>%select(-starts_with(".pred"))
+
+## Add new predictions
+  np_post<-yield_fit%>%
+    predict(np_post,type="prob")%>%
+    bind_cols(np_post)
+
+## Calculate Net Price by Income
+  post_price<-np_post%>%
+    mutate(`Income Quintile`=ntile(income,5))%>%
+    group_by(`Income Quintile`)%>%
+    summarize(`New Price`=mean(net_price))
+
+## Count Enrollment
+  post_enroll<-np_post%>%
+    filter(.pred_Enrolled>.5)%>%
     count()%>%
-    bind_cols(
-      np%>%
-        group_by(yield)%>%
-        count()
-    )
+    as_vector()%>%
+    number(big.mark = ",")
 
+  post_revenues<-dollar(sum(np_post$net_price[np_post$.pred_Enrolled>.5]))
 
-}
+summary_data<-left_join(pre_price,post_price)%>%
+  pivot_longer(cols=-`Income Quintile`)%>%
+  rename(Policy=name,`Net Price`=value)
 
-
-
-
-
+gg<-summary_data%>%
+  ggplot(aes(x=`Income Quintile`,y=`Net Price`,fill=Policy))+
+  geom_col(position="dodge")+
+  labs(caption = paste("Enrollment under current policy:",pre_enroll,"\n",
+                       "Enrollment under new policy:",post_enroll,"\n",
+                       "Revenues under current policy:",pre_revenues,"\n",
+                       "Revenues under new policy:",post_revenues))+
+  ggtitle("Impact of Policy Change")+
+  dark_theme_minimal()+
+ theme(plot.caption=element_text(size=12))
+gg
+} # End summary change function
 
 ######################################################
 # Shiny App Elements
@@ -279,6 +323,7 @@ tabPanel(
                     selected = "income"
                       )
     ), # End first row
+
     fluidRow(img(
       src = "vu06br.jpg",
       align = "bottom",
@@ -335,13 +380,23 @@ selectInput(
 tabPanel(
   "Policy Decisions Based on Model",
 
-  ## Choose: need aid more responsive
-  ## merit aid more responsive
-  ## charge 5k more to one or all of legacies, sent scores, registered
-  ## Total Enrollment
 
   # Sidebar with a checkbox for type
   sidebarLayout(sidebarPanel(
+fluidRow(
+    sliderInput(inputId = "enroll_prob",
+                label="Minimum Enrollment Probability",
+                min=.2,
+                max=.8,
+                value=c(.45,.55)
+                )),
+fluidRow(
+  sliderInput(inputId = "price_drop",
+              label="Reduction in Net Price",
+              min=1000,
+              max=10000,
+              value=5000
+  )),
 
     fluidRow(img(
       src = "vu06br.jpg",
@@ -352,7 +407,7 @@ tabPanel(
   ), # End sidebar
 
   # Show a plot
-  mainPanel()
+  mainPanel(plotOutput("PolicyChangePlot"))
   ) # End sidebar
 )# End policy tab panel
 #####################################################
@@ -399,6 +454,13 @@ tabPanel(
         model_fit_plot(input$model_metric)
       },bg="transparent") ## End Income Plot Output
 
+
+      ## Policy Change Plot
+      output$PolicyChangePlot<-renderPlot({
+        summary_change(prob_min = input$enroll_prob[1],
+                        prob_max = input$enroll_prob[2],
+        price_drop=input$price_drop)
+      })
 
     }# End Server
 

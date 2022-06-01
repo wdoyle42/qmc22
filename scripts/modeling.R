@@ -198,7 +198,7 @@ yield_recipe<-recipe(yield_formula,ad_sub)%>%
 yield_wf<-yield_wf%>%
   update_recipe(yield_recipe)
 
-tune_fit_notest<-TRUE
+tune_fit_notest<-FALSE
 
 if(tune_fit_notest){
 
