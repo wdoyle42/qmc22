@@ -5,6 +5,7 @@ library(shinythemes)
 library(ggdark)
 library(snakecase)
 library(tidymodels)
+library(glmnet)
 
 
 ###########################################
@@ -135,7 +136,7 @@ model_fit_plot<-function(my_metric){
     model_fit_data%>%
     filter(Metric==my_metric)%>%
     ggplot(aes(x=`Model Type`,y=Estimate,color=`Model Type`))+
-    geom_point()+
+    geom_point(size=10)+
     geom_pointrange(aes(ymin=lower_ci,ymax=upper_ci))+
     ylab(my_metric)+
     coord_flip()+
@@ -258,12 +259,21 @@ ui <- fluidPage(
                      choices = unique(all_aid$`Aid Type`),
                      selected = "Institutional Grants")
                  ),
+                 fluidRow(HTML("Source: College Board, Trends in Student Aid")),
                  fluidRow(img(
                    src = "vu06br.jpg",
                    align = "bottom",
                    height = 150,
                    width = 140
-                 ))
+                 )),
+                 fluidRow(img(
+                   src = "aid_simulation.png",
+                   align = "bottom",
+                   height = 150,
+                   width = 140
+                 )),
+              fluidRow(HTML("https://wdoyle42.shinyapps.io/aid_simulation/")),
+              fluidRow(HTML("tw:@wdoyle42, email:w.doyle@vanderbilt.edu"))
                ), # End sidebar
 
                # Show a plot of the generated distribution
@@ -290,6 +300,7 @@ ui <- fluidPage(
             choices = unique(inst_aid$Type),
             selected = "All")
           ), # End first row
+           fluidRow(HTML("Source: National Postsecondary Student Aid Survey, DataLab")),
         fluidRow(img(
           src = "vu06br.jpg",
           align = "bottom",
@@ -323,7 +334,7 @@ tabPanel(
                     selected = "income"
                       )
     ), # End first row
-
+   fluidRow(HTML("Data generated using covariances estimated from High School Longitudinal Study" )),
     fluidRow(img(
       src = "vu06br.jpg",
       align = "bottom",
@@ -358,6 +369,7 @@ selectInput(
   label="Choose Measure of Model Fit",
   choices=unique(model_fit_data$Metric),
   selected = "Accuracy")),
+fluidRow(HTML("Measures of model fit based on cross validation from three different specifications of model. Models utilize feature selection via elastic net, with hyparameters tuned via 1000 Monte Carlo cross validations." )),
     fluidRow(img(
       src = "vu06br.jpg",
       align = "bottom",
@@ -397,7 +409,7 @@ fluidRow(
               max=10000,
               value=5000
   )),
-
+fluidRow(HTML("Model results using all variables. Inputs above change net price for selected students, after which new probabilities of enrollment are calculated" )),
     fluidRow(img(
       src = "vu06br.jpg",
       align = "bottom",

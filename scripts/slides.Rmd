@@ -1,0 +1,406 @@
+---
+title: "Privacy, Proprietary Data and Simulation"
+author: "Will Doyle"
+date: "6/2/2022"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,message = FALSE,error = FALSE,warning=FALSE)
+```
+
+```{r}
+library(shiny)
+library(tidyverse)
+library(scales)
+library(shinythemes)
+library(ggdark)
+library(snakecase)
+library(tidymodels)
+library(glmnet)
+
+
+###########################################
+# Data input
+###########################################
+
+
+inst_aid <- read_csv("../data/cleaned/inst_aid.csv") %>%
+  mutate(upper_ci = Amount + (1.96 * SE)) %>%
+  mutate(lower_ci = Amount - (1.96 * SE)) %>%
+  mutate(
+    Income = fct_relevel(
+      Income ,
+      "Income:0-30k",
+      "Income:30k-60k",
+      "Income: 50-70k",
+      "Income: 70-100k",
+      "Income 100-150" ,
+      "Income 150k+"
+    )
+  )
+
+
+all_aid <- read_csv("../data/cleaned/aid_amounts.csv") %>%
+  pivot_longer(cols = -Year) %>%
+  mutate(value = value * 1e6) %>%
+  rename(Total = value,
+         `Aid Type` = name)
+
+
+sim_data <- read_rds("../data/cleaned/admit_data.rds")%>%
+rename_with(to_title_case)
+
+
+yield_data <- read_rds("../data/cleaned/admit_data.rds")%>%
+  mutate(sat=sat/100,
+         income=income/1000,
+         distance=distance/1000)
+
+load("model_fit_data.rdata")
+
+model_fit_data<-model_fit_data%>%
+  mutate(lower_ci=Estimate-(1.96*SE))%>%
+    mutate(upper_ci=Estimate-(1.96*SE))
+
+load("fit_list.rdata")
+
+##################################
+# Summary Data Function
+##################################
+
+
+summary_plot <- function(myvar) {
+  gg <-
+    if (length(unique(sim_data[[myvar]])) > 10) {
+      sim_data %>%
+        mutate(plot_x_var = ntile(.data[[myvar]], 5)) %>%
+        group_by(plot_x_var) %>%
+        summarize("Average Yield" = mean(Yield)) %>%
+        ggplot(aes(
+          x = plot_x_var,
+          y = `Average Yield`,
+          fill = as_factor(plot_x_var)
+        )) +
+        geom_col() +
+        xlab(paste(myvar, "Quintile")) +
+        theme_minimal()+
+        theme(legend.position="none")
+    }else {
+      sim_data %>%
+        group_by(.data[[myvar]]) %>%
+        summarize("Average Yield" = mean(Yield)) %>%
+        ggplot(aes(
+          x = as_factor(.data[[myvar]]),
+          y = `Average Yield`,
+          fill = as_factor(.data[[myvar]])
+        )) +
+        geom_col() +
+        theme_minimal()+
+        xlab(myvar)+
+        theme(legend.position = "none")
+    } # End if/else
+  gg
+}
+
+##################################
+# Total Aid Plot Function
+##################################
+
+total_aid_plot <- function(total_aid_type) {
+  gg <- all_aid %>%
+    filter(`Aid Type` %in% total_aid_type) %>%
+    ggplot(aes(x = Year, y = Total, color = `Aid Type`)) +
+    geom_line() +
+    scale_y_continuous(labels = dollar_format(scale_cut = cut_short_scale())) +
+    ggtitle("Total Amount of Student Financial Aid by Source, 1973-2019")+
+    theme_minimal()
+  gg
+}
+
+
+##################################
+# Aid by Income  Plot Function
+##################################
+
+
+inst_aid_plot <- function(inst_type) {
+  gg <- inst_aid %>%
+    filter(Type %in% inst_type) %>%
+    ggplot(aes(x = Income, y = Amount, color = Type)) +
+    geom_point() +
+    geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci)) +
+    scale_y_continuous(labels = dollar_format()) +
+    ggtitle("Average Aid Awarded to Students by Income Level, 2016")+
+    theme_minimal()
+  gg
+}
+
+
+
+##################################
+# Model Fit  Plot Function
+##################################
+
+
+model_fit_plot<-function(my_metric){
+  gg<-
+    model_fit_data%>%
+    filter(Metric==my_metric)%>%
+    ggplot(aes(x=`Model Type`,y=Estimate,color=`Model Type`))+
+    geom_point(size=10)+
+    geom_pointrange(aes(ymin=lower_ci,ymax=upper_ci))+
+    ylab(my_metric)+
+    coord_flip()+
+    theme_minimal()+
+    theme(legend.position = "none")
+gg
+}
+
+
+
+##################################
+# Summary Stats Function
+##################################
+
+summary_change<-function(
+  model_type="All Variables",
+                         prob_min=.45,
+                         prob_max=.55,
+                         price_drop=10000){
+
+yield_fit<-fit_list[[model_type]]
+
+np<-yield_data
+
+## Predict for current
+
+np<-yield_fit%>%
+  predict(np,type="prob")%>%
+  bind_cols(np)
+
+pre_price<-  np%>%
+    mutate(`Income Quintile`=ntile(income,5))%>%
+    group_by(`Income Quintile`)%>%
+    summarize(`Current Price`=mean(net_price))
+
+pre_enroll<-np%>%
+  filter(.pred_Enrolled>.5)%>%
+  count()%>%
+  as_vector()%>%
+  number(big.mark = ",")
+
+pre_revenues<-dollar(sum(np$net_price[np$.pred_Enrolled>.5]))
+## Use inputs to set these three amounts
+
+## Predict for targeted policy
+
+## Set prices based on new policy
+np_post<-np%>%
+    mutate(net_price=ifelse(.pred_Enrolled>prob_min|.pred_Enrolled<prob_max,
+           net_price-price_drop,
+           net_price
+           ))
+
+## Drop old predictions
+np_post<-np_post%>%select(-starts_with(".pred"))
+
+## Add new predictions
+  np_post<-yield_fit%>%
+    predict(np_post,type="prob")%>%
+    bind_cols(np_post)
+
+## Calculate Net Price by Income
+  post_price<-np_post%>%
+    mutate(`Income Quintile`=ntile(income,5))%>%
+    group_by(`Income Quintile`)%>%
+    summarize(`New Price`=mean(net_price))
+
+## Count Enrollment
+  post_enroll<-np_post%>%
+    filter(.pred_Enrolled>.5)%>%
+    count()%>%
+    as_vector()%>%
+    number(big.mark = ",")
+
+  post_revenues<-dollar(sum(np_post$net_price[np_post$.pred_Enrolled>.5]))
+
+summary_data<-left_join(pre_price,post_price)%>%
+  pivot_longer(cols=-`Income Quintile`)%>%
+  rename(Policy=name,`Net Price`=value)
+
+gg<-summary_data%>%
+  ggplot(aes(x=`Income Quintile`,y=`Net Price`,fill=Policy))+
+  geom_col(position="dodge")+
+  labs(caption = paste("Enrollment under current policy:",pre_enroll,"\n",
+                       "Enrollment under new policy:",post_enroll,"\n",
+                       "Revenues under current policy:",pre_revenues,"\n",
+                       "Revenues under new policy:",post_revenues))+
+  ggtitle("Impact of Policy Change")+
+  theme_minimal()+
+ theme(plot.caption=element_text(size=12))
+gg
+} # End summary change function
+
+```
+
+## Privacy, Proprietary Data and Simulation
+
+github: github.com/wdoyle42/qmc22
+
+slidy application: https://wdoyle42.shinyapps.io/aid_simulation/
+
+![./aid_simulation.png]
+
+tw: @wdoyle42
+
+em: w.doyle@vanderbilt.edu
+
+
+## Institutional Aid
+
+```{r}
+total_aid_plot(total_aid_type = c("Institutional Grants"))
+
+```
+Source: College Board, Trends in Student Aid
+
+
+
+## Institutional Aid
+```{r}
+total_aid_plot(total_aid_type = c("Institutional Grants",
+                                  "Pell Grants"))
+
+```
+Source: College Board, Trends in Student Aid
+
+
+
+## Institutional Aid
+```{r}
+total_aid_plot(total_aid_type = c("Institutional Grants",
+                                  "Pell Grants",
+                                  "State Grants"))
+
+```
+Source: College Board, Trends in Student Aid
+
+## Institutional Aid by Income
+```{r}
+inst_aid_plot(inst_type = "All")
+
+```
+Source: National Postsecondary Student Aid Study
+
+## Institutional Aid by Income
+```{r}
+inst_aid_plot(inst_type = c("Private 4,  Doctorate",
+                           "Private 4, Non-Doctorate"))
+
+```
+Source: National Postsecondary Student Aid Study
+
+## Institutional Aid by Income
+```{r}
+inst_aid_plot(inst_type = c("Public 4,  Doctorate",
+                           "Public 4, Non-Doctorate"))
+
+```
+Source: National Postsecondary Student Aid Study
+
+
+## Predicted Yield by Student Characteristics
+```{r}
+summary_plot(myvar = "Income")
+```
+Data simulated from covariances in the High School Longitudinal Study
+
+
+## Predicted Yield by Student Characteristics
+```{r}
+summary_plot(myvar = "Gpa")
+```
+Data simulated from covariances in the High School Longitudinal Study
+
+
+
+## Predicted Yield by Student Characteristics
+```{r}
+summary_plot(myvar = "Legacy")
+```
+Data simulated from covariances in the High School Longitudinal Study
+
+
+## Predicted Yield by Student Characteristics
+```{r}
+summary_plot(myvar = "Visit")
+```
+Data simulated from covariances in the High School Longitudinal Study
+
+
+## Predicted Yield by Student Characteristics
+```{r}
+summary_plot(myvar = "Fit")
+```
+Data simulated from covariances in the High School Longitudinal Study
+
+
+## Predicted Yield by Student Characteristics
+```{r}
+summary_plot(myvar = "Net Price")
+```
+Data simulated from covariances in the High School Longitudinal Study
+
+## Model Fit: Accuracy
+```{r}
+model_fit_plot(my_metric = "Accuracy")
+```
+
+Summary measure of model fit from logistic regression with feature selection via elastic net. Penalty and mixture parameters set from 1000 replicate Monte Carlo cross validation. 
+
+## Model Fit: AUC
+```{r}
+model_fit_plot(my_metric="AUC")
+```
+
+Summary measure of model fit from logistic regression with feature selection via elastic net. Penalty and mixture parameters set from 1000 replicate Monte Carlo cross validation.
+
+## Summarizing Policy Changes: Reducing Net Price for Students With Prob of Enrollment between .45 and .55 by $1,000
+```{r}
+summary_change(prob_min=.45,
+               prob_max=.55,
+               price_drop=1000)
+```
+Predictions from best fit model including all variables 
+
+
+## Summarizing Policy Changes: Reducing Net Price for Students With Prob of Enrollment between .45 and .55 by $5,000
+```{r}
+summary_change(prob_min=.45,
+               prob_max=.55,
+               price_drop=5000)
+```
+Predictions from best fit model including all variables 
+
+
+## Summarizing Policy Changes: Reducing Net Price for Students With Prob of Enrollment between .45 and .55 by $10,000
+```{r}
+summary_change(prob_min=.45,
+               prob_max=.55,
+               price_drop=10000)
+```
+Predictions from best fit model including all variables 
+
+
+## Privacy, Proprietary Data and Simulation
+
+github: gith
+
+slidy application: https://wdoyle42.shinyapps.io/aid_simulation/
+
+![./aid_simulation.png]
+
+tw: @wdoyle42
+
+em: w.doyle@vanderbilt.edu
