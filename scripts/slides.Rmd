@@ -250,7 +250,7 @@ github: github.com/wdoyle42/qmc22
 
 slidy application: https://wdoyle42.shinyapps.io/aid_simulation/
 
-![./aid_simulation.png]
+<img src="aid_simulation.png"  width="200" height="200"/>
 
 tw: @wdoyle42
 
@@ -392,15 +392,15 @@ summary_change(prob_min=.45,
 ```
 Predictions from best fit model including all variables 
 
-
 ## Privacy, Proprietary Data and Simulation
 
-github: gith
+github: github.com/wdoyle42/qmc22
 
 slidy application: https://wdoyle42.shinyapps.io/aid_simulation/
 
-![./aid_simulation.png]
+<img src="aid_simulation.png"  width="200" height="200"/>
 
 tw: @wdoyle42
 
 em: w.doyle@vanderbilt.edu
+
